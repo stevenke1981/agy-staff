@@ -233,7 +233,7 @@ export async function stopExecution(root, known = [], table = processTable) {
   signal(table(), 'SIGKILL');
 }
 
-export async function runStreaming({ binary, args, job, budget, signal, update, conversation }) {
+export async function runStreaming({ binary, args, input, job, budget, signal, update, conversation }) {
   const hardDeadline = Date.now() + Math.max(0, budget);
   const rawFd = fs.openSync(job.events_file, 'a');
   const projection = createProjection(conversation);
@@ -284,13 +284,20 @@ export async function runStreaming({ binary, args, job, budget, signal, update, 
     child = spawn(binary, args, {
       detached: process.platform !== 'win32',
       windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
     });
     const exited = new Promise((resolve) => {
       child.once('error', (error) => { spawnError = error; resolve({ exit: null, killedSignal: null }); });
       child.once('exit', (exit, killedSignal) => resolve({ exit, killedSignal }));
     });
     const closed = new Promise((resolve) => child.once('close', resolve));
+    if (input !== undefined) {
+      child.stdin.on('error', error => {
+        // EPIPE means the child closed input; let its actual exit/result decide success.
+        if (error.code !== 'EPIPE') safely(() => { throw error; });
+      });
+      child.stdin.end(input); // EOF completes the single official stream-json turn.
+    }
     track();
     // ps is cheap; the PowerShell CIM query on Windows takes 1-3 s and runs
     // synchronously, so sample less often there to keep the event loop free.

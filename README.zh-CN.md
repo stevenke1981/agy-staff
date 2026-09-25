@@ -1,3 +1,9 @@
+# AGY Staff for Codex — Windows adaptation
+
+This branch uses **agy-codex**, not the upstream Codex plugin name. Read [README.zh-TW.md](README.zh-TW.md) and [CODEX-WINDOWS.md](docs/CODEX-WINDOWS.md) for the adapted workflow and installation. Codex remains the lead; worker tools are restricted by default. The upstream documentation below is retained for attribution and legacy Claude/Pi reference, not the Codex installation path for this fork.
+
+---
+
 <p align="center"><img src="assets/logo/gemini-agy.svg" width="440" alt="AGY-STAFF"></p>
 
 <p align="center"><a href="README.md">English</a> | <a href="README.zh-CN.md">简体中文</a></p>

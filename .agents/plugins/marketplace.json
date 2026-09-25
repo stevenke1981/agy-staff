@@ -1,11 +1,11 @@
 {
-  "name": "agy-staff",
+  "name": "agy-staff-codex",
   "interface": {
-    "displayName": "Agy Staff"
+    "displayName": "AGY Staff for Codex"
   },
   "plugins": [
     {
-      "name": "agy",
+      "name": "agy-codex",
       "source": {
         "source": "local",
         "path": "."

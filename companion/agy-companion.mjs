@@ -93,6 +93,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { boundSnapshot, excerpt } from './observation.mjs';
+import { createAgyCommand, parseStreamResult, enforceStrictResult, withCodexContract } from './codex-platform.mjs';
 import { atomicJSON, runStreaming, processIdentity } from './stream-worker.mjs';
 import { withStateLock, replaceFile, readTextRetry } from './state-lock.mjs';
 
@@ -104,8 +105,7 @@ const AGY_BIN = process.env.AGY_BIN || 'agy';
  *  Node script (the test fake), run it through the current Node binary so the
  *  launch does not depend on shebang support (Windows has none: EFTYPE). */
 function agyCommand(args) {
-  if (/\.(mjs|cjs|js)$/i.test(AGY_BIN)) return { cmd: process.execPath, args: [AGY_BIN, ...args] };
-  return { cmd: AGY_BIN, args };
+  return createAgyCommand(AGY_BIN, args);
 }
 const AGY_SETTINGS = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'settings.json');
 
@@ -725,6 +725,7 @@ function runAgy(invoke) {
   const budget = (durationToMs(timeout) ?? 600_000) + 60_000; // grace over agy's own timeout
   const agy = agyCommand(args);
   const r = spawnSync(agy.cmd, agy.args, {
+    input: agy.input,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
     timeout: budget,
@@ -742,8 +743,9 @@ function runAgy(invoke) {
   const stderr = (r.stderr || '').trim();
   // agy prints a single-line JSON object; be defensive about leading noise.
   const start = stdout.indexOf('{');
-  let payload = null;
-  if (start >= 0) {
+  const codexStream = process.env.AGY_STAFF_CODEX_TRANSPORT === '1';
+  let payload = codexStream ? parseStreamResult(stdout) : null;
+  if (!codexStream && start >= 0) {
     try {
       payload = JSON.parse(stdout.slice(start));
     } catch {
@@ -807,6 +809,8 @@ function triageResult({ payload, stderr, exit }, mode, profile, profileSource, r
       (payload.error ? `\nagy error: ${payload.error}` : '') + convNote), { reason: 'response_timeout' });
   }
 
+  // Codex must never accept an ERROR response merely because it contains text.
+  enforceStrictResult(payload, exit);
   if ((status && status !== 'SUCCESS') || exit !== 0) {
     if (response) {
       // Preserve response text and diagnostics for the orchestrator to assess.
@@ -1176,7 +1180,7 @@ async function executeRun(resolved, prompt, opts, execution = null) {
 }
 
 function cmdRun(mode, opts) {
-  const task = taskText(opts); // Resolve prompt-file/stdin in the caller's cwd.
+  const task = withCodexContract(taskText(opts)); // Resolve prompt-file/stdin in the caller's cwd.
   const resolved = resolveRun(mode, opts);
   enterOriginalWorkspace(resolved.originalCwd);
   if (resolved.parentJobId) {
@@ -1281,7 +1285,7 @@ async function workerMain(jobId) {
     const opts = { ...spec.opts, jobId };
     const output = await executeRun(spec.resolved, spec.prompt, opts, (invoke) => {
       const agy = agyCommand(agyArgs(invoke, 'stream-json'));
-      return runStreaming({ binary: agy.cmd, args: agy.args, job,
+      return runStreaming({ binary: agy.cmd, args: agy.args, input: agy.input, job,
         budget: durationToMs(spec.resolved.timeout) - (Date.now() - started), signal: controller.signal,
         update: (fields) => updateJob(jobId, fields),
         conversation: (id) => rememberConversation(spec.resolved, id, jobId),
