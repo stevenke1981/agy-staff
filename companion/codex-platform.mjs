@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export function resolveAgyBinary(binary = 'agy', options = {}) {
   const platform = options.platform ?? process.platform;
@@ -40,6 +41,10 @@ export function createAgyCommand(binary, argv, options = {}) {
     else args.push('--output-format', 'stream-json');
     args.push('--input-format', 'stream-json');
     input = JSON.stringify({ event: 'user', message: { content: prompt } }) + '\n';
+  }
+  if (enabled && at >= 0 && env.AGY_STAFF_ACCOUNT && env.AGY_STAFF_ACCOUNT !== 'native' && env.AGY_STAFF_ACCOUNT_WORKER !== '1') {
+    const worker = fileURLToPath(new URL('./codex-account-worker.mjs', import.meta.url));
+    return { cmd: process.execPath, args: [worker, '--binary', executable, '--', ...args], input };
   }
   if (/\.(mjs|cjs|js)$/i.test(executable)) {
     return { cmd: process.execPath, args: [executable, ...args], input };

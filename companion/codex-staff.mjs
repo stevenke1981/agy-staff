@@ -7,6 +7,9 @@ import { randomUUID, createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createAgyCommand } from './codex-platform.mjs';
+import { accountsRoot, loadRegistry, assertAlias } from './account-store.mjs';
+import { accountsMain } from './codex-accounts.mjs';
+import { mediaMain } from './codex-media.mjs';
 
 const SELF = fileURLToPath(import.meta.url);
 const RUN = new Set(['ask', 'research', 'review', 'staffer', 'implement', 'continue']);
@@ -34,6 +37,10 @@ export function parseOptions(argv) {
     if (t === '--workspace') {
       if (workspaceSet || !raw[i + 1] || raw[i + 1].startsWith('--')) throw new Error('Use one --workspace <path>.');
       workspaceSet = true; output.cwd = path.resolve(raw[++i]);
+    } else if (t === '--account') {
+      if (output.account !== undefined || !raw[i + 1]) throw new Error('Use one --account auto|native|ALIAS.');
+      output.account = raw[++i];
+      if (!['auto', 'native'].includes(output.account)) assertAlias(output.account);
     } else if (t === '--allow-worker-tools') {
       if (output.allowTools) throw new Error('Duplicate --allow-worker-tools.');
       output.allowTools = true;
@@ -64,12 +71,13 @@ export function planInvocation(argv, options = {}) {
   if (command === 'implement' || command === 'staffer') {
     if (!(options.linked ?? isLinkedWorktree)(cwd)) throw new Error('Worker writes require a linked Git worktree. Run prepare first.');
   }
+  let prior;
   if (command === 'continue') {
     const at = args.indexOf('--job');
     if (at < 0) throw new Error('Continue requires --job <id>; implicit last-session resume is disabled.');
     const root = git(cwd, ['rev-parse', '--show-toplevel']);
     const state = JSON.parse(fs.readFileSync(path.join(root, '.agy-staff', 'state.json'), 'utf8'));
-    const prior = state.jobs?.find(j => j.id === args[at + 1]);
+    prior = state.jobs?.find(j => j.id === args[at + 1]);
     if (!prior) throw new Error('Job not found in this workspace.');
     if (!prior.cwd || fs.realpathSync(prior.cwd) !== fs.realpathSync(cwd)) throw new Error('Resume from the original job working directory.');
     if (['implement', 'staffer'].includes(prior.mode) && !(options.linked ?? isLinkedWorktree)(cwd)) throw new Error('Implementation resume requires its original worktree.');
@@ -78,6 +86,21 @@ export function planInvocation(argv, options = {}) {
     // Explicit flag wins over any profile inherited from a legacy job.
   }
   const env = { ...(options.env ?? process.env), AGY_STAFF_CODEX_TRANSPORT: '1', AGY_STAFF_STRICT_RESULT: '1' };
+  delete env.AGY_STAFF_ACCOUNT_WORKER;
+  delete env.AGY_STAFF_ACCOUNT; delete env.AGY_STAFF_ACCOUNT_SESSION;
+  if (RUN.has(command)) {
+    const registry = loadRegistry(accountsRoot(env));
+    const account = command === 'continue' ? (prior.codex_account || 'native') : (parsed.account || registry?.default || 'native');
+    if (command === 'continue' && parsed.account !== undefined && parsed.account !== account) throw new Error('Cannot change account routing mode during continuation; start a new task instead.');
+    if (account !== 'native') {
+      if (!registry) throw new Error('Run accounts init and login first.');
+      if (account !== 'auto' && !registry.accounts.some(a => a.alias === account && a.enabled)) throw new Error('Selected account is missing or disabled.');
+      if (args.includes('--conversation')) throw new Error('Account-routed conversations must resume with continue --job ID.');
+      env.AGY_STAFF_ACCOUNT_SESSION = command === 'continue' ? prior.codex_account_session : randomUUID();
+      if (!/^[0-9a-f-]{36}$/.test(env.AGY_STAFF_ACCOUNT_SESSION || '')) throw new Error('Original account runtime is missing; do not resume under a different login.');
+    }
+    env.AGY_STAFF_ACCOUNT = account;
+  } else if (parsed.account !== undefined) throw new Error('--account applies to task runs, not job management.');
   if (env.AGY_STAFF_MODEL && RUN.has(command) && !args.includes('--model') && !args.includes('--effort')) args.push('--model', env.AGY_STAFF_MODEL);
   if (RUN.has(command) && command !== 'ask') args.push(allowTools ? '--unrestricted' : '--restricted');
   return { command, cwd, env, args: [command, ...args] };
@@ -111,14 +134,16 @@ export function doctor(cwd, env = process.env) {
     agy_version: version.text.trim().slice(0, 160),
     note: 'No login/model request was sent. Authentication, model availability and Codex Desktop integration still need a live smoke test. No global settings changed.' };
 }
-export function main(argv = process.argv.slice(2)) {
+export async function main(argv = process.argv.slice(2)) {
+  if (argv[0] === 'accounts') return accountsMain(argv.slice(1));
+  if (['media', 'image', 'video', 'music'].includes(argv[0])) return mediaMain(argv);
   const p = parseOptions(argv);
   if (p.command === 'help' || p.command === '--help') {
-    console.log('Codex AGY Staff: doctor | prepare | ask | review | research | staffer | implement | continue --job ID | status | wait | result | observe | cancel\nUse --workspace PATH and --prompt-file FILE for tasks. Implement/staffer require prepare + an isolated worktree.\nRestricted is default, NOT a read-only OS sandbox. --allow-worker-tools is explicit per-run opt-in for implementation in a worktree.\nUse the SAME --workspace for status/wait/cancel/continue. No automatic restart, commit, push, permission change or model fallback.');
+    console.log('Codex AGY Staff: media help | image | video | music | accounts help | doctor | prepare | ask | review | research | staffer | implement | continue --job ID | status | wait | result | observe | cancel\nUse --workspace PATH and --prompt-file FILE for tasks; --account auto|native|ALIAS overrides the local default. Implement/staffer require prepare + an isolated worktree.\nRestricted is default, NOT a read-only OS sandbox. --allow-worker-tools is explicit per-run opt-in for implementation in a worktree.\nUse the SAME --workspace for status/wait/cancel/continue. No automatic restart, commit, push, permission change or model fallback.');
     return 0;
   }
   if (['doctor', 'prepare'].includes(p.command)) {
-    if (p.args.length || p.allowTools) throw new Error(`${p.command} accepts only --workspace.`);
+    if (p.args.length || p.allowTools || p.account !== undefined) throw new Error(`${p.command} accepts only --workspace.`);
     const out = p.command === 'doctor' ? doctor(p.cwd) : prepareWorktree(p.cwd);
     console.log(JSON.stringify(out, null, 2));
     return out.ok === false ? 1 : 0;
@@ -132,6 +157,6 @@ export function main(argv = process.argv.slice(2)) {
   return r.status ?? 1;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  try { process.exitCode = main(); }
+  try { process.exitCode = await main(); }
   catch (error) { console.error(`agy-codex: ${error.message}`); process.exitCode = 1; }
 }

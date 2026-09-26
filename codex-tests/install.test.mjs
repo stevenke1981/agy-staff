@@ -17,18 +17,21 @@ function setup(t) {
   }
   fs.mkdirSync(path.join(repo, 'templates'));
   for (const name of ['ask', 'review', 'research', 'implement', 'staffer', 'harness-compatibility']) fs.writeFileSync(path.join(repo, 'templates', name + '.md'), 'fixture template');
-  for (const name of ['lead', 'reviewer', 'implementer', 'jobs']) {
+  for (const name of ['lead', 'reviewer', 'implementer', 'jobs', 'media']) {
     fs.mkdirSync(path.join(repo, 'codex-skills', name), { recursive: true });
     fs.writeFileSync(path.join(repo, 'codex-skills', name, 'SKILL.md'), '原檔向上兩層的入口。\nTask guidance.');
   }
+  fs.mkdirSync(path.join(repo, 'docs')); fs.writeFileSync(path.join(repo, 'docs', 'MEDIA.zh-TW.md'), 'fixture media guide');
   fs.writeFileSync(path.join(repo, 'LICENSE'), 'test license placeholder');
-  fs.writeFileSync(path.join(repo, '.agy-codex-adaptation.json'), JSON.stringify({ version: '0.7.3-codex.1', files }));
+  fs.writeFileSync(path.join(repo, '.agy-codex-adaptation.json'), JSON.stringify({ version: '0.7.3-codex.3', files }));
   return { dir, repo, home, dest: path.join(home, '.agents', 'skills', 'agy-codex') };
 }
 test('user-skill installation includes runtime and corrects plugin-relative paths', t => {
   const f = setup(t), r = installSkill(f.repo, { home: f.home });
   assert.equal(r.installed, f.dest); assert.equal(r.backup, null); assert.equal(r.global_config_changed, false);
-  assert.ok(fs.existsSync(path.join(f.dest, 'runtime', 'companion', 'agy-companion.mjs')));
+  for (const rel of RUNTIME_FILES) assert.ok(fs.existsSync(path.join(f.dest, 'runtime', rel)));
+  assert.ok(fs.existsSync(path.join(f.dest, 'references', 'media.md')));
+  assert.equal(fs.readFileSync(path.join(f.dest, 'references', 'media-guide.md'), 'utf8'), 'fixture media guide');
   const ref = fs.readFileSync(path.join(f.dest, 'references', 'lead.md'), 'utf8');
   assert.match(ref, /runtime\/companion\/codex-staff.mjs/); assert.ok(!ref.includes('向上兩層'));
 });

@@ -14,3 +14,10 @@ exit 3：失敗／崩潰。exit 4：已取消。exit 5：需處理的可續接�
 已停止的工作才可 `continue --job JOB_ID --prompt-file "修正任務檔" --workspace "原工作區"`。
 遇到同一錯誤先改證據／輸入／程式再續接，最多兩次實質修復；不繞過權限或偷偷换模型。
 完成前收集結果與測試證據，不把 job id、部分文字或 background 啟動當成完成。
+
+
+## 多帳號
+在同一 codex-staff 入口使用 `accounts list`；需要設定再讀 `../../docs/ACCOUNTS.zh-TW.md`。
+新任務可加 `--account auto|native|ALIAS`，預設只有使用者明確設定才改。
+續接固定 `continue --job ID --workspace 原路徑`；不能重設會話或重跑工具來達成切換。
+勿讀／要求／提交 Google OAuth token；只顯示別名與必要狀態。

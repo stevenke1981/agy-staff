@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "bundled_binaries": false,
+  "cli_proxy_api": {
+    "tag": "v7.3.17",
+    "reviewed_on": "2026-09-26",
+    "windows_x64_asset": "CLIProxyAPI_7.3.17_windows_amd64.zip",
+    "archive_sha256": "3a036376a7c04a8fe70d7335915aa79cc520f8fad72030ef8da43a64e50bc38b",
+    "release_asset_id": 586628630,
+    "source": "https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/395990468/assets?per_page=4&page=3"
+  },
+  "pi_agy_reference_commit": "32c1fa661b4d6cf8d37c7cc791d936da0ad426b4",
+  "media": {
+    "bridge_versions": {
+      "gemini": "1.0.0",
+      "grok": "1.0.0",
+      "chatgpt": "2.0.0"
+    },
+    "ffmpeg_and_ffprobe_required": true,
+    "native_agy_required_for": "agy-native image only",
+    "live_generation_verified": false
+  }
+}

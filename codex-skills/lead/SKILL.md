@@ -13,3 +13,10 @@ description: Delegate a bounded research or second-opinion task to AGY while Cod
 取得 job id 後照 jobs 流程收集。Codex 核對證據，再自己整合。沒有 AGY 結果時不空等、不宣稱完成。
 不得為了錯誤自動加入 `--allow-worker-tools`。不要用 worker 產圖、影片、音訊、提交或部署。
 以繁中簡短回報實際結果與未驗證事項，避免例行多輪審查。
+
+
+## 多帳號
+在同一 codex-staff 入口使用 `accounts list`；需要設定再讀 `../../docs/ACCOUNTS.zh-TW.md`。
+新任務可加 `--account auto|native|ALIAS`，預設只有使用者明確設定才改。
+續接固定 `continue --job ID --workspace 原路徑`；不能重設會話或重跑工具來達成切換。
+勿讀／要求／提交 Google OAuth token；只顯示別名與必要狀態。

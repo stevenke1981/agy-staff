@@ -67,7 +67,7 @@ worktree 共用 Git metadata；禁止將它描述為 OS 安全沙箱。
 Codex 前景及背景入口只接受單一有效 result；重複結果、格式錯誤或缺少結果會失敗。
 背景原始串流仍保留在 job 的 `.events.jsonl`，可用於診斷；不会因此自動重送請求。
 每次修復都需改動根因／輸入／測試，最多兩次有意義重試；這是主 Agent 工作規則，不是已實作的全自動重試排程器。
-此版本不會自動重試、切模型、提權、重啟另一個 job，避免重複副作用。
+不自動重跑整個工作、切模型、提權或重建job；已明確啟用的coding帳號池僅依ACCOUNTS規則處理尚未交付的推理請求。
 
 ## 測試與明確限制
 
@@ -90,3 +90,12 @@ Codex 前景及背景入口只接受單一有效 result；重複結果、格式�
 - AGY Windows 安裝： https://antigravity.google/docs/cli/install
 
 核對日期：2026-09-25。以目前安裝版 help 和實測結果為準，不把來源文件視為本機已驗證。
+
+
+## 多帳號（codex.2）
+
+完整指令與資料保護見 [ACCOUNTS.zh-TW.md](ACCOUNTS.zh-TW.md)。切換模型帳號不修改 Codex 登入或全域設定；原先的權限、worktree 和 jobs 合約不變。
+
+## 圖片／影片／音樂（codex.3）
+
+詳見 [MEDIA.zh-TW.md](MEDIA.zh-TW.md)。媒體命令有獨立state／exit合約；不經coding staffer／worktree，不使用coding帳號池。先安裝FFmpeg/ffprobe，再執行新增測試；`media doctor`不消耗生成功能額度。

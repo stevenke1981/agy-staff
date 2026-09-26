@@ -81,7 +81,7 @@ test('Pi manifest exposes only branded skills and stays aligned with plugin vers
     const plugin = json(path.join(ROOT, host, 'plugin.json'));
     // This fork intentionally versions/names its Codex adapter separately.
     assert.equal(plugin.name, host === '.codex-plugin' ? 'agy-codex' : 'agy');
-    assert.equal(plugin.version, host === '.codex-plugin' ? '0.7.3-codex.1' : manifest.version);
+    assert.equal(plugin.version, host === '.codex-plugin' ? '0.7.3-codex.3' : manifest.version);
     if (host === '.codex-plugin') assert.equal(plugin.skills, './codex-skills/');
   }
 });

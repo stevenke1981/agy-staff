@@ -1218,6 +1218,8 @@ async function dispatch(resolved, prompt, opts) {
     parent_job_id: opts.parentJobId || resolved.parentJobId || null,
     started_at: new Date().toISOString(), log_file: logFile, result_file: resultFile,
     spec_file: specFile,
+    codex_account: process.env.AGY_STAFF_ACCOUNT || 'native',
+    codex_account_session: process.env.AGY_STAFF_ACCOUNT_SESSION || null,
     events_file: path.join(jobsDir, `${jobId}.events.jsonl`),
     progress_file: path.join(jobsDir, `${jobId}.progress.json`),
   };

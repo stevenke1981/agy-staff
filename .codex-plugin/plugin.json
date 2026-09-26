@@ -1,6 +1,6 @@
 {
   "name": "agy-codex",
-  "version": "0.7.3-codex.1",
+  "version": "0.7.3-codex.3",
   "description": "Codex-led, Windows-native AGY delegation with restricted defaults and isolated implementation worktrees.",
   "author": {
     "name": "Keli Wen",

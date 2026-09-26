@@ -6,8 +6,8 @@ import os from 'node:os';
 import { randomUUID, createHash } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 const SELF = fileURLToPath(import.meta.url);
-const VERSION = '0.7.3-codex.1';
-export const RUNTIME_FILES = ['companion/agy-companion.mjs', 'companion/stream-worker.mjs', 'companion/observation.mjs', 'companion/state-lock.mjs', 'companion/codex-platform.mjs', 'companion/codex-staff.mjs'];
+const VERSION = '0.7.3-codex.3';
+export const RUNTIME_FILES = ['companion/agy-companion.mjs', 'companion/stream-worker.mjs', 'companion/observation.mjs', 'companion/state-lock.mjs', 'companion/codex-platform.mjs', 'companion/codex-staff.mjs', 'companion/account-store.mjs', 'companion/account-proxy.mjs', 'companion/account-gateway.mjs', 'companion/codex-account-worker.mjs', 'companion/codex-accounts.mjs', 'companion/media-core.mjs', 'companion/media-mcp.mjs', 'companion/media-artifacts.mjs', 'companion/media-tool-hook.mjs', 'companion/media-native.mjs', 'companion/media-service.mjs', 'companion/codex-media.mjs'];
 export function installSkill(repo, { home = os.homedir(), update = false } = {}) {
   const root = fs.realpathSync(repo);
   const adaptation = JSON.parse(fs.readFileSync(path.join(root, '.agy-codex-adaptation.json'), 'utf8'));
@@ -45,11 +45,14 @@ export function installSkill(repo, { home = os.homedir(), update = false } = {})
     }
     fs.copyFileSync(path.join(root, 'LICENSE'), path.join(stage, 'LICENSE'));
     fs.mkdirSync(path.join(stage, 'references'));
-    for (const name of ['lead', 'reviewer', 'implementer', 'jobs']) {
-      const ref = fs.readFileSync(path.join(root, 'codex-skills', name, 'SKILL.md'), 'utf8').split('\n').filter(line => !line.includes('向上兩層')).join('\n');
+    for (const name of ['lead', 'reviewer', 'implementer', 'jobs', 'media']) {
+      const ref = fs.readFileSync(path.join(root, 'codex-skills', name, 'SKILL.md'), 'utf8').split('\n').filter(line => !line.includes('向上兩層')).join('\n').replaceAll('../../docs/ACCOUNTS.zh-TW.md', 'accounts.md').replaceAll('../../docs/MEDIA.zh-TW.md', 'media-guide.md');
       fs.writeFileSync(path.join(stage, 'references', name + '.md'), '入口一律使用本 skill 根目錄下 runtime/companion/codex-staff.mjs。\n\n' + ref);
     }
-    fs.writeFileSync(path.join(stage, 'SKILL.md'), `---\nname: agy-codex\ndescription: Explicitly delegate bounded AGY research, review or isolated implementation from Codex on Windows; Codex retains control and verification.\n---\n# AGY Staff for Codex\n以本 SKILL.md 所在資料夾為根目錄，所有入口一律使用此根目錄下的 runtime/companion/codex-staff.mjs。不要使用 references 內原 plugin 相對位置。\n使用 node 與完整引號路徑，先 doctor --workspace，然後依任務只讀 references/lead.md、reviewer.md、implementer.md 或 jobs.md。\nCodex 為主 Agent；小任務直接做，不遞迴委派。實作使用 prepare 回傳的 worktree；受限預設不是 OS 唯讀保證。\n不改全域設定、批准規則或媒體路由。未經該次授權不加 --allow-worker-tools。等待實際結果與測試，不把啟動當成完成。\n`);
+    const accountDoc = path.join(root, 'docs', 'ACCOUNTS.zh-TW.md');
+    if (fs.existsSync(accountDoc)) fs.copyFileSync(accountDoc, path.join(stage, 'references', 'accounts.md'));
+    fs.copyFileSync(path.join(root, 'docs', 'MEDIA.zh-TW.md'), path.join(stage, 'references', 'media-guide.md'));
+    fs.writeFileSync(path.join(stage, 'SKILL.md'), `---\nname: agy-codex\ndescription: Explicit AGY workers and image, video, music generation from Codex on Windows, with durable jobs and verified artifacts.\n---\n# AGY Staff for Codex\n以本 SKILL.md 所在資料夾為根目錄，所有入口一律使用此根目錄下的 runtime/companion/codex-staff.mjs。不要使用 references 內原 plugin 相對位置。\n使用 node 與完整引號路徑。程式任務先 doctor --workspace，依任務只讀 references/lead.md、reviewer.md、implementer.md 或 jobs.md。明確圖片、影片、音樂任務先讀 references/media.md 與 media-guide.md，使用 image/video/music 及 media status/wait/resume/collect/cancel；不經 coding staffer、不需要專案 worktree。\n多帳號先讀 references/accounts.md；命令 accounts help/list；使用者明確設定 accounts use auto 才成為預設，單次可加 --account auto|native|ALIAS。首次各帳號需在瀏覽器登入；不要要求使用者貼 token。續接只用 continue --job，不換會話目錄。\nCodex 為主 Agent；小任務直接做，不遞迴委派。實作使用 prepare 回傳的 worktree；受限預設不是 OS 唯讀保證。\n不改全域設定與批准規則。媒體只採用此次選定的 provider；AGY 原生只用 image，音樂用 gemini-bridge，影片用 gemini-bridge 或明確指定 grok-bridge。媒體不使用帳號池、不盲目改 provider 或重送。未經該次授權不加 --allow-worker-tools。等待實際結果與測試，不把啟動當成完成。\n`);
     fs.mkdirSync(path.join(stage, 'agents')); fs.writeFileSync(path.join(stage, 'agents', 'openai.yaml'), 'policy:\n  allow_implicit_invocation: false\n');
     fs.writeFileSync(path.join(stage, '.agy-codex-managed.json'), JSON.stringify({ product: 'agy-staff-codex', version: VERSION, source: root }, null, 2) + '\n');
     fs.mkdirSync(path.dirname(dest), { recursive: true });
