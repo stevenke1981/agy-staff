@@ -47,26 +47,42 @@ export function createAgyCommand(binary, argv, options = {}) {
   return { cmd: executable, args, input };
 }
 
-export function parseStreamResult(stdout) {
+export function createResultValidator() {
   let result;
+  return {
+    accept(event) {
+      if (!event || typeof event !== 'object' || Array.isArray(event)) throw new Error('Invalid AGY event envelope.');
+      if (event.event !== 'result') return;
+      if (result !== undefined) throw new Error('Multiple AGY results for one prompt; no result accepted.');
+      const value = event.result;
+      if (!value || typeof value !== 'object' || Array.isArray(value) ||
+          (value.status != null && typeof value.status !== 'string') ||
+          (value.response != null && typeof value.response !== 'string')) {
+        throw new Error('Invalid AGY result envelope.');
+      }
+      result = value;
+    },
+    result: () => result ?? null,
+  };
+}
+
+export function parseStreamResult(stdout) {
+  const validator = createResultValidator();
   for (const raw of String(stdout).replace(/^\uFEFF/, '').split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) continue;
     let event;
     try { event = JSON.parse(line); } catch { throw new Error('AGY emitted malformed stream-json; no result accepted.'); }
-    if (!event || typeof event !== 'object' || Array.isArray(event)) throw new Error('Invalid AGY event envelope.');
-    if (event.event !== 'result') continue;
-    if (result !== undefined) throw new Error('Multiple AGY results for one prompt; no result accepted.');
-    if (!event.result || typeof event.result !== 'object' || Array.isArray(event.result)) {
-      throw new Error('Invalid AGY result envelope.');
-    }
-    result = event.result;
+    validator.accept(event);
   }
-  return result ?? null;
+  return validator.result();
 }
 
 export function enforceStrictResult(payload, exit, env = process.env) {
   if (env.AGY_STAFF_STRICT_RESULT !== '1') return;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw Object.assign(new Error('AGY did not return a valid result.'), { code: 'AGY_RESULT_FAILED' });
+  }
   if (String(payload.status).toUpperCase() === 'SUCCESS' && exit === 0) return;
   // Partial work remains visible, but never changes the failure into a successful job.
   const partial = typeof payload.response === 'string' ? payload.response.trim() : '';

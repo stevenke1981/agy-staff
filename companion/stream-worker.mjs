@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import { createParser, createProjection, excerpt, boundSnapshot } from './observation.mjs';
 import { replaceFile } from './state-lock.mjs';
+import { createResultValidator } from './codex-platform.mjs';
 
 export function atomicJSON(file, value) {
   const tmp = `${file}.tmp-${process.pid}`;
@@ -237,6 +238,8 @@ export async function runStreaming({ binary, args, input, job, budget, signal, u
   const hardDeadline = Date.now() + Math.max(0, budget);
   const rawFd = fs.openSync(job.events_file, 'a');
   const projection = createProjection(conversation);
+  const strict = process.env.AGY_STAFF_CODEX_TRANSPORT === '1';
+  const validator = strict ? createResultValidator() : null;
   let payload = null, stderr = '', stdoutTail = '', lastPublish = 0, child, root, deadline, publishTimer, trackingTimer;
   let stopping = null, reason = null, spawnError = null, streamError = null;
   const tracked = new Map();
@@ -307,11 +310,12 @@ export async function runStreaming({ binary, args, input, job, budget, signal, u
     if (signal.aborted) abort();
     deadline = setTimeout(() => stop('hard_timeout'), Math.max(0, hardDeadline - Date.now()));
     const parser = createParser((event) => {
+      validator?.accept(event);
       projection.accept(event);
       if (event.event === 'result' && event.result && typeof event.result === 'object') { payload = event.result; track(); }
       if (Date.now() - lastPublish >= 100) publish();
       else if (!publishTimer) publishTimer = setTimeout(() => { publishTimer = null; safely(publish); }, 100);
-    }, projection.warn, 64 * 1024 * 1024);
+    }, projection.warn, 64 * 1024 * 1024, { strict });
     child.stdout.on('data', (chunk) => safely(() => {
       fs.writeSync(rawFd, chunk);
       stdoutTail = excerpt(stdoutTail + chunk.toString('utf8'), 8192, true).text;

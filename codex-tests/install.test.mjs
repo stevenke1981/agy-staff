@@ -62,6 +62,16 @@ test('missing template fails before removing previous active skill', t => {
   assert.throws(() => installSkill(f.repo, { home: f.home, update: true }));
   assert.ok(fs.readFileSync(path.join(f.dest, 'SKILL.md')).equals(old));
 });
+test('missing runtime checksum refuses an update and preserves the active skill', t => {
+  const f = setup(t); installSkill(f.repo, { home: f.home });
+  const marker = path.join(f.repo, '.agy-codex-adaptation.json');
+  const manifest = JSON.parse(fs.readFileSync(marker, 'utf8'));
+  delete manifest.files['companion/observation.mjs'];
+  fs.writeFileSync(marker, JSON.stringify(manifest));
+  const old = fs.readFileSync(path.join(f.dest, 'SKILL.md'));
+  assert.throws(() => installSkill(f.repo, { home: f.home, update: true }), /checksum missing or invalid/);
+  assert.ok(fs.readFileSync(path.join(f.dest, 'SKILL.md')).equals(old));
+});
 test('preserves global Codex settings and other installed skills byte for byte', t => {
   const f = setup(t);
   const config = path.join(f.home, '.codex', 'config.toml'), other = path.join(f.home, '.agents', 'skills', 'other', 'SKILL.md');

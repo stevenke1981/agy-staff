@@ -46,7 +46,11 @@ test('generation is deterministic, copies assets, detects drift and rejects stal
   assert.throws(() => generatePiSkills({ root }), /Unexpected generated files/);
   assert.equal(fs.readFileSync(unexpected, 'utf8'), 'user edit');
   fs.unlinkSync(unexpected);
-  fs.symlinkSync(source, unexpected);
+  // Windows junctions exercise the same link rejection without requiring
+  // Developer Mode or the privilege needed for file symlinks.
+  fs.symlinkSync(process.platform === 'win32' ? path.dirname(source) : source,
+    unexpected, process.platform === 'win32' ? 'junction' : 'file');
+  assert.equal(fs.lstatSync(unexpected).isSymbolicLink(), true);
   assert.throws(() => generatePiSkills({ root }), /symlinks/);
 });
 

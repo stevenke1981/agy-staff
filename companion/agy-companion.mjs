@@ -1665,7 +1665,7 @@ function cmdContinue(opts) {
   if (!mode || !conversation) die('no previous agy-staff conversation recorded in this repository for this target; use restart <job-id> when no conversation is available');
   if (opts.job && opts.conversation && opts.conversation !== prior.conversation_id) die('--job and --conversation identify different conversations');
   if (opts.job && !prior.conversation_id) die('this job has no known conversation; use restart <job-id>');
-  const task = taskText(opts);
+  const task = withCodexContract(taskText(opts));
   if (!task) die('continue needs follow-up text');
   enterOriginalWorkspace(prior?.cwd);
   const resolved = resolveRun(mode, { ...opts, conversation }, prior);

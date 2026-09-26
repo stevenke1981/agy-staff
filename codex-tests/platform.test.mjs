@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { resolveAgyBinary, createAgyCommand, parseStreamResult, enforceStrictResult, withCodexContract } from '../companion/codex-platform.mjs';
+import { createParser } from '../companion/observation.mjs';
 const on = { AGY_STAFF_CODEX_TRANSPORT: '1', AGY_STAFF_STRICT_RESULT: '1' };
 
 test('Windows: discovers official native executable in a spaced Unicode path', () => {
@@ -78,6 +79,35 @@ test('nonzero exit and missing success status cannot pass strict validation', ()
 });
 test('legacy non-Codex result policy remains unchanged', () => {
   assert.doesNotThrow(() => enforceStrictResult({ status: 'ERROR', response: 'x' }, 1, {}));
+});
+test('strict result validation rejects absent payloads with an actionable error', () => {
+  for (const payload of [null, undefined, []]) {
+    assert.throws(() => enforceStrictResult(payload, 0, on), { code: 'AGY_RESULT_FAILED' });
+  }
+  for (const result of [{ status: 42 }, { status: 'SUCCESS', response: {} }]) {
+    assert.throws(() => parseStreamResult(JSON.stringify({ event: 'result', result })), /Invalid AGY result/);
+  }
+});
+test('strict streaming parser preserves split UTF-8, BOM, CRLF and an unterminated final record', () => {
+  const events = [];
+  const parser = createParser(e => events.push(e), () => assert.fail('Unexpected warning'), 1024, { strict: true });
+  const input = Buffer.from('\uFEFF{"event":"init"}\r\n{"event":"result","result":{"status":"SUCCESS","response":"繁體中文"}}');
+  for (const byte of input) parser.write(Buffer.from([byte]));
+  parser.end();
+  assert.equal(events.length, 2);
+  assert.equal(events[1].result.response, '繁體中文');
+});
+test('strict streaming parser rejects invalid and oversized records while legacy stays tolerant', () => {
+  for (const input of ['garbage\n', 'null\n', '[]\n', '42\n', '{"incomplete":']) {
+    const parser = createParser(() => {}, () => {}, 1024, { strict: true });
+    assert.throws(() => { parser.write(Buffer.from(input)); parser.end(); }, /malformed|envelope/);
+  }
+  const parser = createParser(() => {}, () => {}, 8, { strict: true });
+  assert.throws(() => parser.write(Buffer.from('{"event":"init"}\n')), /Oversized/);
+  const warnings = [];
+  const legacy = createParser(() => {}, message => warnings.push(message));
+  legacy.write(Buffer.from('garbage\n')); legacy.end();
+  assert.equal(warnings.length, 1);
 });
 test('contract preserves task bytes, omits empty task, and leaves legacy untouched', () => {
   const task = '修正\n繁中 path & --flag';

@@ -16,7 +16,8 @@ export function installSkill(repo, { home = os.homedir(), update = false } = {})
     const src = path.join(root, file);
     if (!fs.lstatSync(src).isFile() || fs.lstatSync(src).isSymbolicLink()) throw new Error(`Invalid runtime file: ${file}`);
     const expected = adaptation.files[file];
-    if (expected && createHash('sha256').update(fs.readFileSync(src, 'utf8').replace(/\r\n/g, '\n')).digest('hex') !== expected) throw new Error(`Runtime modified since apply: ${file}`);
+    if (typeof expected !== 'string' || !/^[a-f0-9]{64}$/.test(expected)) throw new Error(`Runtime checksum missing or invalid: ${file}`);
+    if (createHash('sha256').update(fs.readFileSync(src, 'utf8').replace(/\r\n/g, '\n')).digest('hex') !== expected) throw new Error(`Runtime modified since apply: ${file}`);
   }
   const agents = path.join(home, '.agents');
   const dest = path.join(agents, 'skills', 'agy-codex');

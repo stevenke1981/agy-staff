@@ -63,6 +63,9 @@ worktree 共用 Git metadata；禁止將它描述為 OS 安全沙箱。
 `status`／`wait`／`observe`／`result`／`cancel` 一律帶同一 workspace。
 僅在作業停止後使用 `continue --job JOB_ID --prompt-file FILE --workspace ORIGINAL`。
 新入口不暴露 blind restart，也不採用不具名的「上一個對話」。
+每次 `continue --job` 都重新帶上 Codex 主控規則，並保留原 conversation 和 parent job 關係。
+Codex 前景及背景入口只接受單一有效 result；重複結果、格式錯誤或缺少結果會失敗。
+背景原始串流仍保留在 job 的 `.events.jsonl`，可用於診斷；不会因此自動重送請求。
 每次修復都需改動根因／輸入／測試，最多兩次有意義重試；這是主 Agent 工作規則，不是已實作的全自動重試排程器。
 此版本不會自動重試、切模型、提權、重啟另一個 job，避免重複副作用。
 
@@ -71,6 +74,8 @@ worktree 共用 Git metadata；禁止將它描述為 OS 安全沙箱。
 `node scripts/test-codex.mjs` 執行新模組測試與真實 patched companion + fake AGY 整合。
 `node scripts/test-codex.mjs --legacy` 執行既有回歸。原 Pi manifest assertion 被修改為明確區分 Codex fork 的名字／版號，而不是刪除檢查。
 測試不使用真實 AGY 登入或配額；CI 也不配置任何真實憑證。
+整合測試另外安裝到臨時使用者目錄，直接執行安裝後的前景及背景入口。
+安裝器要求六個 runtime 檔案都有有效 SHA-256；缺少或不符合時保留現有安裝並停止更新。
 
 尚待實機驗收：Windows 11 中文帳號路徑、桌面版首次載入、沙箱／登入可用性、真實 stream-json schema、
 长工作取消的所有子程序、桌面版重新開啟後的 job 續接。

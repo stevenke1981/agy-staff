@@ -121,7 +121,7 @@ export function createProjection(onConversation = () => {}) {
 
 // Bound the pending record independently of raw file retention. Large/malformed
 // records degrade observation; only a valid result event can complete a job.
-export function createParser(onEvent, onWarning, maxRecord = 8 * 1024 * 1024) {
+export function createParser(onEvent, onWarning, maxRecord = 8 * 1024 * 1024, { strict = false } = {}) {
   const decoder = new StringDecoder('utf8');
   let pending = '', pendingBytes = 0, dropping = false;
   const consume = (text) => {
@@ -130,13 +130,18 @@ export function createParser(onEvent, onWarning, maxRecord = 8 * 1024 * 1024) {
       if (!dropping) {
         const fragmentBytes = Buffer.byteLength(fragment);
         if (pendingBytes + fragmentBytes > maxRecord) {
+          if (strict) throw new Error('Oversized AGY stream record; no result accepted.');
           pending = ''; pendingBytes = 0; dropping = true; onWarning('Oversized record omitted from projection; see raw output.');
         } else { pending += fragment; pendingBytes += fragmentBytes; }
       }
       if (end) {
         if (!dropping && pending.trim()) {
           let event;
-          try { event = JSON.parse(pending); } catch { onWarning('Malformed record retained in raw output.'); }
+          try { event = JSON.parse(strict ? pending.trim() : pending); } catch {
+            if (strict) throw new Error('AGY emitted malformed stream-json; no result accepted.');
+            onWarning('Malformed record retained in raw output.');
+          }
+          if (strict && (!event || typeof event !== 'object' || Array.isArray(event))) throw new Error('Invalid AGY event envelope.');
           if (event && typeof event === 'object') onEvent(event);
         }
         pending = ''; pendingBytes = 0; dropping = false;
